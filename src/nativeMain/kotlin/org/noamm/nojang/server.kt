@@ -2,6 +2,9 @@
 
 package org.noamm.nojang
 
+import com.ucasoft.ktor.simpleCache.SimpleCache
+import com.ucasoft.ktor.simpleCache.cacheOutput
+import com.ucasoft.ktor.simpleMemoryCache.memoryCache
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
@@ -17,6 +20,7 @@ import org.noamm.nojang.database.repositories.MojangRepository
 import org.noamm.nojang.http.createHttpClient
 import org.noamm.nojang.plugins.CallLogging
 import org.noamm.nojang.services.*
+import kotlin.time.Duration.Companion.minutes
 
 fun module(app: Application) = with(app) {
     val json = Json {
@@ -27,6 +31,7 @@ fun module(app: Application) = with(app) {
     install(XForwardedHeaders) { forHeaders.add(0, "CF-Connecting-IP") }
     install(ContentNegotiation) { json(json) }
     install(CallLogging)
+    install(SimpleCache) { memoryCache { invalidateAt = 5.minutes } }
 
     val database = configureDatabase()
     val http = createHttpClient(json)
@@ -40,7 +45,8 @@ fun module(app: Application) = with(app) {
     routing {
         get("/") { call.respondText("ok") }
 
-        get("{query}") { mojangController.lookup(call) }
+        // keyed on path only, so it must never wrap the POST route
+        cacheOutput { get("{query}") { mojangController.lookup(call) } }
         post { mojangController.lookupAll(call) }
     }
 }
