@@ -9,13 +9,10 @@ RUN --mount=type=cache,target=/root/.gradle --mount=type=cache,target=/root/.kon
 
 FROM ubuntu:24.04
 
-ENV TZ=Asia/Jerusalem
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates tzdata && rm -rf /var/lib/apt/lists/* && \
-    ln -sf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 COPY --from=build /Nojang .
 
-EXPOSE 8080
 ENTRYPOINT ["./Nojang"]
