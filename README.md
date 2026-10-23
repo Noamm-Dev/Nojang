@@ -17,7 +17,13 @@ Results and misses are cached in SQLite for 60 minutes.
 
 ## Running
 
-Ktor Native server doesn't support Windows, so build and run through Docker:
+Ktor Native server doesn't support Windows, so run it through Docker.
 
-- `docker build -t nojang .`: builds the release image `nojang`.
-- `docker run --rm --init --name nojang --network host -e DATABASE_PATH=/apps/files/nojang.db -v "$PWD/apps/files:/apps/files" nojang`: runs it on the host network (port 8080), keeping the SQLite cache in `./apps/files/nojang.db` on the host.
+Every push to `main` publishes `ghcr.io/noamm-dev/nojang`, tagged `latest` and with the commit sha:
+
+- `docker pull ghcr.io/noamm-dev/nojang:latest`: pulls the latest image.
+- `docker run --rm --init --name nojang --network host -e DATABASE_PATH=/apps/files/nojang.db -v "$PWD/apps/files:/apps/files" ghcr.io/noamm-dev/nojang:latest`: runs it on the host network (port 8080), keeping the SQLite cache in `./apps/files/nojang.db` on the host.
+
+Or build it yourself:
+
+- `docker build -t nojang .`: builds the release image `nojang`, run it the same way with `nojang` as the image.
