@@ -43,10 +43,8 @@ fun module(app: Application) = with(app) {
     MojangCachePruner(mojangRepository).start(this)
 
     routing {
-        get("/") { call.respondText("ok") }
-
-        // keyed on path only, so it must never wrap the POST route
         cacheOutput { get("{query}") { mojangController.lookup(call) } }
         post { mojangController.lookupAll(call) }
+        get { call.respondText("ok") }
     }
 }
