@@ -1,8 +1,7 @@
 @file:OptIn(ExperimentalAtomicApi::class)
 
-package http
+package org.noamm.nojang.http
 
-import engine.curl.Curl
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.compression.ContentEncoding
@@ -15,29 +14,33 @@ import io.ktor.util.logging.KtorSimpleLogger
 import io.ktor.utils.io.core.Closeable
 import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
-import utils.activeIpv4Addresses
+import org.noamm.nojang.curlfork.Curl
+import org.noamm.nojang.utils.publicIpv4Addresses
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
-private val logger = KtorSimpleLogger("ProxyService")
-private val ipRotations = ConcurrentMap<String, AtomicInt>()
 
-fun Application.createHttpClients(): ProxyHttpClient {
+fun Application.createHttpClient(): ProxyHttpClient {
     val client = ProxyHttpClient()
-    monitor.subscribe(ApplicationStopped) { client.close() }
+    monitor.subscribe(ApplicationStopped) { runBlocking { client.close() } }
     return client
 }
 
 class ProxyHttpClient: Closeable {
-    val clientPool = run {
-        val realIps = activeIpv4Addresses().filter { ! isSiteLocal(it) && ! isLinkLocal(it) && ! isLoopback(it) && ! isTailscale(it) }
-        val clients = realIps.distinct().map { createClient(it) }
+    private val logger = KtorSimpleLogger("ProxyHttpClient")
+    private val ipRotations = ConcurrentMap<String, AtomicInt>()
+
+    private val clientPool = run {
+        val realIps = publicIpv4Addresses()
+        val clients = realIps.map(::createClient)
 
         if (clients.isEmpty()) logger.warn("No public IPs detected for rotation, falling back to the default interface.")
         else logger.info("Detected public IPs for rotation: $realIps")
 
         clients.ifEmpty { listOf(createClient()) }
     }
+
+    val size get() = clientPool.size
 
     fun getClient(rotationId: String): HttpClient {
         val atomicI = ipRotations.computeIfAbsent(rotationId) { AtomicInt(0) }
@@ -64,30 +67,11 @@ class ProxyHttpClient: Closeable {
             forceHttp1 = true
         }
 
-        // without it curl waits forever on a hung mojang, holding an upstream permit the whole time
         install(HttpTimeout) {
             connectTimeoutMillis = 5_000
             requestTimeoutMillis = 10_000
         }
         install(ContentEncoding)
         install(ContentNegotiation) { json(JSON) }
-    }
-
-    private fun octets(ip: String) = ip.split('.').map(String::toInt)
-    private fun isLoopback(ip: String) = octets(ip)[0] == 127
-
-    private fun isSiteLocal(ip: String): Boolean {
-        val (a, b) = octets(ip)
-        return a == 10 || (a == 172 && b in 16 .. 31) || (a == 192 && b == 168)
-    }
-
-    private fun isLinkLocal(ip: String): Boolean {
-        val (a, b) = octets(ip)
-        return a == 169 && b == 254
-    }
-
-    private fun isTailscale(ip: String): Boolean {
-        val (a, b) = octets(ip)
-        return a == 100 && b >= 64 && b <= 127
     }
 }

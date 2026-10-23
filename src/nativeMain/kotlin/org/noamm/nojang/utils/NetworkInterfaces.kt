@@ -1,11 +1,16 @@
-package utils
+@file:OptIn(ExperimentalForeignApi::class)
+
+package org.noamm.nojang.utils
 
 import kotlinx.cinterop.*
 import platform.linux.*
 import platform.posix.*
 
-@OptIn(ExperimentalForeignApi::class)
-fun activeIpv4Addresses(): List<String> = memScoped {
+fun publicIpv4Addresses() = activeIpv4Addresses().filterNot {
+    isLoopback(it) || isSiteLocal(it) || isLinkLocal(it) || isTailscale(it)
+}.distinct()
+
+private fun activeIpv4Addresses(): List<String> = memScoped {
     val head = alloc<CPointerVar<ifaddrs>>()
     if (getifaddrs(head.ptr) != 0) error("getifaddrs() failed with errno $errno")
 
@@ -24,4 +29,22 @@ fun activeIpv4Addresses(): List<String> = memScoped {
     finally {
         freeifaddrs(head.value)
     }
+}
+
+private fun octets(ip: String) = ip.split('.').map(String::toInt)
+private fun isLoopback(ip: String) = octets(ip)[0] == 127
+
+private fun isSiteLocal(ip: String): Boolean {
+    val (a, b) = octets(ip)
+    return a == 10 || (a == 172 && b in 16 .. 31) || (a == 192 && b == 168)
+}
+
+private fun isLinkLocal(ip: String): Boolean {
+    val (a, b) = octets(ip)
+    return a == 169 && b == 254
+}
+
+private fun isTailscale(ip: String): Boolean {
+    val (a, b) = octets(ip)
+    return a == 100 && b >= 64 && b <= 127
 }
