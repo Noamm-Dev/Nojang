@@ -1,0 +1,5 @@
+.gradle/
+.idea/
+build/
+nojang.db*
+.kotlin/
