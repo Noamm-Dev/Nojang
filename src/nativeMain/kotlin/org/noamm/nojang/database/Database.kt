@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalForeignApi::class)
 
-package database
+package org.noamm.nojang.database
 
 import androidx.sqlite.driver.bundled.*
 import io.ktor.server.application.Application
@@ -13,6 +13,12 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import platform.posix.getenv
+
+fun Application.configureDatabase(): Database {
+    val database = Database(getenv("DATABASE_PATH")?.toKString() ?: "nojang.db")
+    monitor.subscribe(ApplicationStopped) { database.close() }
+    return database
+}
 
 /**
  * One writer guarded by a mutex since sqlite only allows a single writer anyway,
@@ -72,10 +78,4 @@ class Database(path: String, readers: Int = 4): Closeable {
             }
         }
     }
-}
-
-fun Application.configureDatabase(): Database {
-    val database = Database(getenv("DATABASE_PATH")?.toKString() ?: "nojang.db")
-    monitor.subscribe(ApplicationStopped) { database.close() }
-    return database
 }

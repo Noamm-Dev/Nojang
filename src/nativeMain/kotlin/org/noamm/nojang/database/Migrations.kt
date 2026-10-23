@@ -1,4 +1,4 @@
-package database
+package org.noamm.nojang.database
 
 /**
  * Applied in order and tracked through `PRAGMA user_version`, only ever append to this list.

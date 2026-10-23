@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalForeignApi::class, DelicateCoroutinesApi::class)
 
-package utils
+package org.noamm.nojang.utils
 
 import io.ktor.server.application.ApplicationStarted
 import io.ktor.server.engine.EmbeddedServer

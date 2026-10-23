@@ -1,4 +1,4 @@
-package http
+package org.noamm.nojang.http
 
 import kotlinx.serialization.json.Json
 

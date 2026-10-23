@@ -1,4 +1,4 @@
-package database
+package org.noamm.nojang.database
 
 import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.SQLiteStatement
