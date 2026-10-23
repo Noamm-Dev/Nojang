@@ -5,7 +5,7 @@ Caching Mojang profile lookup server (Ktor Native, linuxX64), rotating outgoing 
 ## Endpoints
 
 - `GET /{query}`: looks up a player by name or UUID (dashed or not). Returns `{ "name", "id" }`, or `404` if there's no such player.
-- `POST /`: takes a JSON array of names and/or UUIDs (at most 400) and returns the players found, in request order. Misses are dropped.
+- `POST /`: takes a JSON array of names and/or UUIDs (at most 400) and returns the players found, in request order. Misses are dropped. If Mojang fails or ratelimits part of the batch, those queries are dropped too and the response carries `X-Nojang-Incomplete: true`, so retry later.
 
 Results and misses are cached in SQLite for 60 minutes.
 

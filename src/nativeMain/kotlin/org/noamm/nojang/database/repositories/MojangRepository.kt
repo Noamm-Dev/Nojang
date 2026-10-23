@@ -1,39 +1,22 @@
-package database.repositories
+package org.noamm.nojang.database.repositories
 
-import database.Connection
-import database.Database
-import kotlinx.serialization.Serializable
+import org.noamm.nojang.database.Connection
+import org.noamm.nojang.database.Database
+import org.noamm.nojang.models.MojangData
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
 class MojangRepository(private val database: Database) {
-    suspend fun getByUUID(uuid: String, maxAge: Duration = MAX_AGE) = database.read {
-        find(SELECT_BY_UUID, normalize(uuid), maxAge)
-    }
+    suspend fun getByUUID(uuid: String, maxAge: Duration = MAX_AGE) = database.read { find(SELECT_BY_UUID, uuid, maxAge) }
+    suspend fun getByName(name: String, maxAge: Duration = MAX_AGE) = database.read { find(SELECT_BY_NAME, name, maxAge) }
+    suspend fun getByUUIDs(uuids: Collection<String>, maxAge: Duration = MAX_AGE) = database.read { uuids.mapNotNull { find(SELECT_BY_UUID, it, maxAge) } }
+    suspend fun getByNames(names: Collection<String>, maxAge: Duration = MAX_AGE) = database.read { names.mapNotNull { find(SELECT_BY_NAME, it, maxAge) } }
 
-    suspend fun getByName(name: String, maxAge: Duration = MAX_AGE) = database.read {
-        find(SELECT_BY_NAME, name, maxAge)
-    }
-
-    suspend fun getByUUIDs(uuids: Collection<String>, maxAge: Duration = MAX_AGE) = database.read {
-        uuids.mapNotNull { find(SELECT_BY_UUID, normalize(it), maxAge) }
-    }
-
-    suspend fun getByNames(names: Collection<String>, maxAge: Duration = MAX_AGE) = database.read {
-        names.mapNotNull { find(SELECT_BY_NAME, it, maxAge) }
-    }
-
-    suspend fun isMiss(query: String, maxAge: Duration = MAX_AGE) = database.read {
-        findMiss(query, maxAge)
-    }
-
-    suspend fun getMisses(queries: Collection<String>, maxAge: Duration = MAX_AGE) = database.read {
-        queries.filter { findMiss(it, maxAge) }.toSet()
-    }
+    suspend fun isMiss(query: String, maxAge: Duration = MAX_AGE) = database.read { findMiss(query, maxAge) }
+    suspend fun getMisses(queries: Collection<String>, maxAge: Duration = MAX_AGE) = database.read { queries.filter { findMiss(it, maxAge) }.toSet() }
 
     suspend fun save(player: MojangData) = saveAll(listOf(player))
-
     suspend fun saveMiss(query: String) = saveAll(emptyList(), listOf(query))
 
     /**
@@ -83,40 +66,30 @@ class MojangRepository(private val database: Database) {
      * Returns how many players and misses were deleted.
      */
     suspend fun pruneExpired(maxAge: Duration = MAX_AGE) = database.write {
-        val minUpdatedAt = Clock.System.now().toEpochMilliseconds() - maxAge.inWholeMilliseconds
-
         listOf(DELETE_EXPIRED_PLAYERS, DELETE_EXPIRED_MISSES).sumOf { sql ->
             query(sql) {
-                it.bindLong(1, minUpdatedAt)
+                it.bindLong(1, minUpdatedAt(maxAge))
                 it.step()
             }
             query(SELECT_CHANGES) { it.step(); it.getLong(0).toInt() }
         }
     }
 
-    private fun Connection.find(sql: String, value: String, maxAge: Duration): MojangData? {
-        val minUpdatedAt = Clock.System.now().toEpochMilliseconds() - maxAge.inWholeMilliseconds
-
-        return query(sql) {
-            it.bindText(1, value)
-            it.bindLong(2, minUpdatedAt)
-            if (it.step()) MojangData(name = it.getText(1), id = it.getText(0)) else null
-        }
+    private fun Connection.find(sql: String, value: String, maxAge: Duration) = query(sql) {
+        it.bindText(1, value)
+        it.bindLong(2, minUpdatedAt(maxAge))
+        if (it.step()) MojangData(name = it.getText(1), id = it.getText(0)) else null
     }
 
-    private fun Connection.findMiss(value: String, maxAge: Duration): Boolean {
-        val minUpdatedAt = Clock.System.now().toEpochMilliseconds() - maxAge.inWholeMilliseconds
-
-        return query(SELECT_MISS) {
-            it.bindText(1, value)
-            it.bindLong(2, minUpdatedAt)
-            it.step()
-        }
+    private fun Connection.findMiss(value: String, maxAge: Duration) = query(SELECT_MISS) {
+        it.bindText(1, value)
+        it.bindLong(2, minUpdatedAt(maxAge))
+        it.step()
     }
+
+    private fun minUpdatedAt(maxAge: Duration) = Clock.System.now().toEpochMilliseconds() - maxAge.inWholeMilliseconds
 
     private fun normalize(uuid: String) = uuid.replace("-", "").lowercase()
-
-    @Serializable data class MojangData(val name: String, val id: String)
 
     companion object {
         private val MAX_AGE = 60.minutes
