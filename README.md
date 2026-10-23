@@ -12,10 +12,12 @@ Results and misses are cached in SQLite for 60 minutes.
 ## Configuration
 
 - `DATABASE_PATH`: SQLite file path, defaults to `nojang.db`.
+- `HOST`: address to bind, defaults to `0.0.0.0`.
+- `PORT`: port to bind, defaults to `8080`.
 
 ## Running
 
 Ktor Native server doesn't support Windows, so build and run through Docker:
 
 - `docker build -t nojang .`: builds the release image `nojang`.
-- `docker run --rm --init --name nojang --network host nojang`: runs it on the host network (port 8080).
+- `docker run --rm --init --name nojang --network host -e DATABASE_PATH=/apps/files/nojang.db -v "$PWD/apps/files:/apps/files" nojang`: runs it on the host network (port 8080), keeping the SQLite cache in `./apps/files/nojang.db` on the host.

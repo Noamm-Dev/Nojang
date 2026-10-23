@@ -13,7 +13,7 @@ fun main() {
     embeddedServer(
         factory = CIO,
         port = getenv("PORT")?.toKString()?.toInt() ?: 8080,
-        host = "127.0.0.1",
+        host = getenv("HOST")?.toKString() ?: "0.0.0.0",
         module = ::module
     ).apply { stopOnShutdownSignal() }.start(wait = true)
 }
