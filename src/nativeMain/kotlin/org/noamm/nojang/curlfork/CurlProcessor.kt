@@ -2,17 +2,13 @@
  * Copyright 2014-2026 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package engine.curl
+package org.noamm.nojang.curlfork
 
-import engine.curl.CurlTask.*
-import engine.curl.internal.*
 import kotlinx.atomicfu.atomic
-import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.IntVar
-import kotlinx.cinterop.alloc
-import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import org.noamm.nojang.curlfork.internal.*
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -44,37 +40,17 @@ internal class CurlProcessor(coroutineContext: CoroutineContext) {
 
     suspend fun executeRequest(request: CurlRequestData): CurlSuccess {
         val result = CompletableDeferred<CurlSuccess>()
-        taskQueue.send(SendRequest(request, result))
-        curlApi!!.wakeup()
+        taskQueue.send(CurlTask(request, result))
+        curlApi !!.wakeup()
         return result.await()
-    }
-
-    suspend fun sendWebSocketFrame(websocket: CurlWebSocketResponseBody, flags: Int, data: ByteArray) {
-        val result = Job()
-        taskQueue.send(SendWebSocketFrame(websocket, flags, data, result))
-        curlApi!!.wakeup()
-        result.join()
-    }
-
-    /**
-     * Cancels a WebSocket easy handle by enqueuing a cancellation task.
-     * Called when a WebSocket session is closed to ensure the curl easy handle
-     * is removed from the multi handle, preventing stale handles from blocking
-     * the event loop.
-     */
-    fun cancelWebSocket(websocket: CurlWebSocketResponseBody) {
-        val sent = taskQueue.trySend(CancelWebSocket(websocket))
-        if (sent.isSuccess) {
-            curlApi!!.wakeup()
-        }
     }
 
     @OptIn(DelicateCoroutinesApi::class)
     private fun runEventLoop(): Job = curlScope.launch(CoroutineName("curl-processor-loop")) {
         memScoped {
             val transfersRunning = alloc<IntVar>()
-            val api = curlApi!!
-            while (!taskQueue.isClosedForReceive) {
+            val api = curlApi !!
+            while (! taskQueue.isClosedForReceive) {
                 drainTaskQueue(api)
                 api.perform(transfersRunning)
             }
@@ -85,23 +61,16 @@ internal class CurlProcessor(coroutineContext: CoroutineContext) {
         while (true) {
             val task = if (api.hasHandlers()) {
                 taskQueue.tryReceive()
-            } else {
+            }
+            else {
                 taskQueue.receiveCatching()
             }.getOrNull() ?: break
 
-            when (task) {
-                is SendRequest -> handleSendRequest(api, task)
-
-                is SendWebSocketFrame ->
-                    api.sendWebSocketFrame(task.websocket, task.flags, task.data, task.completionHandler)
-
-                is CancelWebSocket ->
-                    api.cancelWebSocket(task.websocket, CancellationException("WebSocket session closed"))
-            }
+            handleSendRequest(api, task)
         }
     }
 
-    private fun handleSendRequest(api: CurlMultiApiHandler, task: SendRequest) {
+    private fun handleSendRequest(api: CurlMultiApiHandler, task: CurlTask) {
         val (requestData, completionHandler) = task
         val requestHandler = api.scheduleRequest(requestData, completionHandler)
 
@@ -117,14 +86,14 @@ internal class CurlProcessor(coroutineContext: CoroutineContext) {
 
     @OptIn(DelicateCoroutinesApi::class)
     fun close() {
-        if (!closed.compareAndSet(false, true)) return
+        if (! closed.compareAndSet(expect = false, update = true)) return
 
         taskQueue.close()
-        curlApi!!.wakeup()
+        curlApi !!.wakeup()
 
         GlobalScope.launch(curlDispatcher) {
-            curlScope.coroutineContext[Job]!!.join()
-            curlApi!!.close()
+            curlScope.coroutineContext[Job] !!.join()
+            curlApi !!.close()
         }.invokeOnCompletion {
             curlDispatcher.close()
         }
@@ -132,26 +101,12 @@ internal class CurlProcessor(coroutineContext: CoroutineContext) {
 
     private fun cancelRequest(easyHandle: EasyHandle, cause: Throwable) {
         curlScope.launch {
-            curlApi!!.cancelRequest(easyHandle, cause)
+            curlApi !!.cancelRequest(easyHandle, cause)
         }
     }
 }
 
-private sealed interface CurlTask {
-
-    data class SendRequest(
-        val requestData: CurlRequestData,
-        val completionHandler: CompletableDeferred<CurlSuccess>,
-    ) : CurlTask
-
-    class SendWebSocketFrame(
-        val websocket: CurlWebSocketResponseBody,
-        val flags: Int,
-        val data: ByteArray,
-        val completionHandler: CompletableJob,
-    ) : CurlTask
-
-    class CancelWebSocket(
-        val websocket: CurlWebSocketResponseBody,
-    ) : CurlTask
-}
+private data class CurlTask(
+    val requestData: CurlRequestData,
+    val completionHandler: CompletableDeferred<CurlSuccess>,
+)

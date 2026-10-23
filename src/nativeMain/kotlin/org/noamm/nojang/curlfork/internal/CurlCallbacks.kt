@@ -2,16 +2,17 @@
  * Copyright 2014-2026 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package engine.curl.internal
+package org.noamm.nojang.curlfork.internal
 
-import engine.curl.internal.Libcurl.READFUNC_ABORT
-import engine.curl.internal.Libcurl.READFUNC_PAUSE
-import io.ktor.utils.io.*
-import io.ktor.utils.io.core.*
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.core.writeFully
+import io.ktor.utils.io.readAvailable
 import kotlinx.cinterop.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.io.Buffer
+import org.noamm.nojang.curlfork.internal.Libcurl.READFUNC_ABORT
+import org.noamm.nojang.curlfork.internal.Libcurl.READFUNC_PAUSE
 import platform.posix.size_t
 import kotlin.coroutines.CoroutineContext
 
@@ -30,7 +31,7 @@ internal fun onHeadersReceived(
     val chunkSize = (size * count).toLong()
     packet.writeFully(buffer, 0, chunkSize)
 
-    if (isFinalHeaderLine(chunkSize, buffer) && !response.bodyStartedReceiving.isCompleted) {
+    if (isFinalHeaderLine(chunkSize, buffer) && ! response.bodyStartedReceiving.isCompleted) {
         response.bodyStartedReceiving.complete(Unit)
     }
 
@@ -53,7 +54,7 @@ internal fun onBodyChunkReceived(
     count: size_t,
     userdata: COpaquePointer
 ): size_t {
-    val wrapper = userdata.fromCPointer<CurlResponseBodyData>()
+    val wrapper = userdata.fromCPointer<CurlHttpResponseBody>()
     return wrapper.onBodyChunkReceived(buffer, size, count)
 }
 
@@ -75,7 +76,8 @@ internal fun onBodyChunkRequested(
         body.readAvailable(1) { source: Buffer ->
             source.readAvailable(buffer, 0, requested)
         }
-    } catch (_: Throwable) {
+    }
+    catch (_: Throwable) {
         return READFUNC_ABORT
     }
     if (readCount > 0) {
@@ -85,9 +87,11 @@ internal fun onBodyChunkRequested(
     CoroutineScope(wrapper.callContext).launch {
         try {
             body.awaitContent()
-        } catch (_: Throwable) {
+        }
+        catch (_: Throwable) {
             // no op, error will be handled on next read on cURL thread
-        } finally {
+        }
+        finally {
             wrapper.onUnpause()
         }
     }
@@ -99,9 +103,3 @@ internal class CurlRequestBodyData(
     val callContext: CoroutineContext,
     val onUnpause: () -> Unit
 )
-
-internal interface CurlResponseBodyData {
-    @OptIn(ExperimentalForeignApi::class)
-    fun onBodyChunkReceived(buffer: CPointer<ByteVar>, size: size_t, count: size_t): size_t
-    fun close(cause: Throwable? = null)
-}

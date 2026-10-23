@@ -2,14 +2,11 @@
  * Copyright 2014-2026 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package engine.curl.internal
+package org.noamm.nojang.curlfork.internal
 
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.convert
-import libcurl.CURL_READFUNC_ABORT
-import libcurl.CURL_READFUNC_PAUSE
-import libcurl.CURL_WRITEFUNC_ERROR
-import libcurl.CURL_WRITEFUNC_PAUSE
+import libcurl.*
 import platform.posix.size_t
 
 @OptIn(ExperimentalForeignApi::class)

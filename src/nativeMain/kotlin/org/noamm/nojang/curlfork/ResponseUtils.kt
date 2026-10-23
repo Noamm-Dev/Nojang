@@ -2,10 +2,10 @@
 * Copyright 2014-2021 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
 */
 
-package engine.curl
+package org.noamm.nojang.curlfork
 
 import io.ktor.http.HeadersBuilder
-import io.ktor.http.cio.*
+import io.ktor.http.cio.HttpHeadersMap
 
 internal fun HttpHeadersMap.toBuilder(): HeadersBuilder {
     val builder = HeadersBuilder()
