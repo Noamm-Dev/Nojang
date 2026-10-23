@@ -1,13 +1,11 @@
 FROM eclipse-temurin:21-jdk AS build
 
-ARG BUILD_TYPE=Release
-
 WORKDIR /work
 
 COPY . .
 RUN --mount=type=cache,target=/root/.gradle --mount=type=cache,target=/root/.konan \
-    sed -i 's/\r$//' gradlew && sh ./gradlew link${BUILD_TYPE}ExecutableNative --no-daemon --console=plain && \
-    cp build/bin/native/*Executable/Nojang.kexe /Nojang
+    sed -i 's/\r$//' gradlew && sh ./gradlew linkReleaseExecutableNative --no-daemon --console=plain && \
+    cp build/bin/native/releaseExecutable/Nojang.kexe /Nojang
 
 FROM ubuntu:24.04
 

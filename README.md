@@ -17,5 +17,5 @@ Results and misses are cached in SQLite for 60 minutes.
 
 Ktor Native server doesn't support Windows, so build and run through Docker:
 
-- `./gradlew dockerBuild`: builds the release image `nojang`.
-- `./gradlew dockerRun`: builds a debug image and runs it on the host network (port 8080).
+- `docker build -t nojang .`: builds the release image `nojang`.
+- `docker run --rm --init --name nojang --network host nojang`: runs it on the host network (port 8080).
