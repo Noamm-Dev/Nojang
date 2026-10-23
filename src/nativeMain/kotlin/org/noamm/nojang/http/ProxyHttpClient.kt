@@ -14,19 +14,19 @@ import io.ktor.util.logging.KtorSimpleLogger
 import io.ktor.utils.io.core.Closeable
 import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
 import org.noamm.nojang.curlfork.Curl
 import org.noamm.nojang.utils.publicIpv4Addresses
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
-
-fun Application.createHttpClient(): ProxyHttpClient {
-    val client = ProxyHttpClient()
-    monitor.subscribe(ApplicationStopped) { runBlocking { client.close() } }
+fun Application.createHttpClient(json: Json): ProxyHttpClient {
+    val client = ProxyHttpClient(json)
+    monitor.subscribe(ApplicationStopped) { client.close() }
     return client
 }
 
-class ProxyHttpClient: Closeable {
+class ProxyHttpClient(val json: Json): Closeable {
     private val logger = KtorSimpleLogger("ProxyHttpClient")
     private val ipRotations = ConcurrentMap<String, AtomicInt>()
 
@@ -72,6 +72,6 @@ class ProxyHttpClient: Closeable {
             requestTimeoutMillis = 10_000
         }
         install(ContentEncoding)
-        install(ContentNegotiation) { json(JSON) }
+        install(ContentNegotiation) { json(json) }
     }
 }

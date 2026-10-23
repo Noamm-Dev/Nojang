@@ -10,26 +10,32 @@ import io.ktor.server.plugins.forwardedheaders.XForwardedHeaders
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.*
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.serialization.json.Json
 import org.noamm.nojang.controllers.MojangController
 import org.noamm.nojang.database.configureDatabase
 import org.noamm.nojang.database.repositories.MojangRepository
-import org.noamm.nojang.http.JSON
 import org.noamm.nojang.http.createHttpClient
 import org.noamm.nojang.plugins.CallLogging
 import org.noamm.nojang.services.*
 
 fun module(app: Application) = with(app) {
-    val http = createHttpClient()
+    val json = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+    }
+
+    install(XForwardedHeaders) { forHeaders.add(0, "CF-Connecting-IP") }
+    install(ContentNegotiation) { json(json) }
+    install(CallLogging)
+
     val database = configureDatabase()
+    val http = createHttpClient(json)
     val mojangRepository = MojangRepository(database)
-    val mojang = MojangService(MojangApi(http), mojangRepository)
-    val mojangController = MojangController(mojang)
+    val mojangApi = MojangApi(http)
+    val mojangService = MojangService(mojangApi, mojangRepository)
+    val mojangController = MojangController(mojangService)
 
     MojangCachePruner(mojangRepository).start(this)
-
-    install(CallLogging)
-    install(XForwardedHeaders) { forHeaders.add(0, "CF-Connecting-IP") }
-    install(ContentNegotiation) { json(JSON) }
 
     routing {
         get("/") { call.respondText("ok") }
