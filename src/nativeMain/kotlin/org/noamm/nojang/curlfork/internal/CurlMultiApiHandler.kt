@@ -98,6 +98,7 @@ internal class CurlMultiApiHandler: Closeable {
                 option(CURLOPT_WRITEDATA, responseWrapper.asCPointer())
                 option(CURLOPT_PRIVATE, responseDataRef.asCPointer())
                 option(CURLOPT_ACCEPT_ENCODING, "")
+                option(CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4)
                 request.connectTimeout?.let {
                     if (it != HttpTimeoutConfig.INFINITE_TIMEOUT_MS) {
                         option(CURLOPT_CONNECTTIMEOUT_MS, request.connectTimeout)
